@@ -25,13 +25,13 @@ st.divider()
 HOURLY_RATE = 80.00
 PH_TZ = pytz.timezone('Asia/Manila')
 
-# Replace these with your actual IDs/Links
-DEPLOYMENT_URL = "https://script.google.com/macros/s/AKfycbx5T84TMKi1tD0Tdwhpg46PVX_E1JQ9uU-S0sBKlSANYWWjRV4aYWIPYzQ8gviQH95szg/exec"
+# IMPORTANT: Ensure these are your actual IDs/Links
+DEPLOYMENT_URL = "PASTE_YOUR_LATEST_WEB_APP_URL_HERE"
 SHEET_ID = "1JAUdxkqV3CmCUZ8EGyhshI6AVhU_rJ1T9N7FE5-JmZM"
 SHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
 DRIVE_FOLDER_ID = "1_JL_SV709nwoFtTC7EJPoHYNcXF-1lvq"
 
-# --- 3. SIDEBAR ADMIN TOGGLE (The Mobile Fix) ---
+# --- 3. SIDEBAR ADMIN TOGGLE ---
 with st.sidebar:
     st.title("Settings")
     admin_mode = st.checkbox("Admin Access")
@@ -70,21 +70,28 @@ if name != "SELECT NAME":
             except: pass
 
         try:
+            # Send Data
             requests.get(DEPLOYMENT_URL, params=params)
             requests.post(DEPLOYMENT_URL, data={"image": image_b64, "filename": photo_name})
-            st.success(f"✅ {status} Logged! Time: {now_ph.strftime('%I:%M %p')}")
+            
+            # --- THE NEW WELCOME MESSAGES ---
+            if status == "Clock IN":
+                st.success(f"⚡ Good luck today, {name}! Clocked in at {now_ph.strftime('%I:%M %p')}.")
+                st.info("💡 Reminder: Quality over speed! Let's make some great prints.")
+            else:
+                st.success(f"🏁 Great work, {name}! Clocked out at {now_ph.strftime('%I:%M %p')}.")
+                st.info("🚗 Drive safe and enjoy your rest!")
+            
             st.balloons()
         except:
-            st.error("Connection failed.")
+            st.error("Connection failed. Check Web App URL.")
 
-# --- 5. ADMIN PANEL (URL Secret OR Sidebar Password) ---
+# --- 5. ADMIN PANEL ---
 if st.query_params.get("view") == "hmaxine" or (admin_mode and admin_pw == "Hmaxine"):
     st.divider()
     st.subheader("🛡️ Manager Dashboard")
     try:
         df = pd.read_csv(SHEET_CSV_URL)
-        
-        # Monthly Summary Calculation
         df['Pay_Num'] = df['Pay'].replace(r'[₱,]', '', regex=True).astype(float).fillna(0)
         df['Date_Obj'] = pd.to_datetime(df['Date'])
         
