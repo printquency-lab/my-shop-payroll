@@ -12,7 +12,7 @@ HOURLY_RATE = 80.00
 PH_TZ = pytz.timezone('Asia/Manila')
 
 # YOUR LINKS
-DEPLOYMENT_URL = "PASTE_YOUR_WEB_APP_URL_HERE"
+DEPLOYMENT_URL = "https://script.google.com/macros/s/AKfycbyBHAwzfzr6nm5uEInSXpGRmZjQIL1XxiSJC-saM3ngHmIqsvp4nAIQkxJSXCVDvYwiUg/exec"
 SHEET_ID = "1JAUdxkqV3CmCUZ8EGyhshI6AVhU_rJ1T9N7FE5-JmZM"
 SHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
 
@@ -60,3 +60,4 @@ with st.expander("🛡️ Admin Panel"):
             st.dataframe(df)
         except:
             st.info("Check your Sheet sharing settings.")
+
