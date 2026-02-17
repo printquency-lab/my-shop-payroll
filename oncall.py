@@ -24,7 +24,7 @@ st.divider()
 HOURLY_RATE = 80.00
 PH_TZ = pytz.timezone('Asia/Manila')
 
-# IMPORTANT: Ensure your Web App URL is updated here
+# IMPORTANT: Ensure this is your NEW Deployment URL from the Apps Script
 DEPLOYMENT_URL = "https://script.google.com/macros/s/AKfycbwxKyz_BswpQfFOt-b2of58KK16n1k0giga8p5FgaseUBYYgjIEQ54YuCva2aElY2Bacw/exec"
 SHEET_ID = "1JAUdxkqV3CmCUZ8EGyhshI6AVhU_rJ1T9N7FE5-JmZM"
 SHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
@@ -56,35 +56,41 @@ if name != "SELECT NAME":
         params = {"Date": date_str, "Time": time_str, "Employee": name, "Status": status, "Hours": "", "Pay": ""}
 
         try:
-            # Load sheet for duplicate check and math
-            df = pd.read_csv(SHEET_CSV_URL)
-            last_entry = df[(df['Employee'] == name) & (df['Date'] == date_str)].tail(1)
-
-            # Block double-clicking
+            # 1. Load data to check status/duplicates
+            df_check = pd.read_csv(SHEET_CSV_URL)
+            last_entry = df_check[(df_check['Employee'] == name) & (df_check['Date'] == date_str)].tail(1)
+            
+            # 2. Duplicate Check
             if not last_entry.empty and last_entry.iloc[0]['Status'] == status:
                 st.warning(f"⚠️ You already clicked {status} for today.")
             else:
-                # Math for Clock OUT
+                # 3. Calculate Pay for Clock Out
                 if status == "Clock OUT":
-                    match = df[(df['Date'] == date_str) & (df['Employee'] == name) & (df['Clock OUT'].isna())]
+                    match = df_check[(df_check['Date'] == date_str) & (df_check['Employee'] == name) & (df_check['Clock OUT'].isna())]
                     if not match.empty:
                         t_in = pd.to_datetime(match.iloc[-1]['Clock IN'])
-                        hrs = (pd.to_datetime(time_str) - t_in).total_seconds() / 3600
+                        t_out = pd.to_datetime(time_str)
+                        hrs = (t_out - t_in).total_seconds() / 3600
                         if hrs > 5: hrs -= 1 # Auto-Lunch
                         params["Hours"] = round(hrs, 2)
                         params["Pay"] = f"₱{round(hrs * HOURLY_RATE, 2)}"
 
-                # Send to Google
-                requests.get(DEPLOYMENT_URL, params=params, timeout=15)
-                requests.post(DEPLOYMENT_URL, data={"image": image_b64, "filename": photo_name}, timeout=15)
+                # 4. SYNCED SUBMISSION LOGIC
+                # Send data to Google
+                res = requests.get(DEPLOYMENT_URL, params=params, timeout=15)
                 
-                st.success(f"✅ {status} Successful!")
-                st.balloons()
+                # Send photo as JSON
+                payload = {"image": image_b64, "filename": photo_name}
+                requests.post(DEPLOYMENT_URL, json=payload, timeout=15)
+
+                if "SYNC_OK" in res.text:
+                    st.success(f"✅ Synced! {status} recorded for {name}.")
+                    st.balloons()
+                else:
+                    st.error(f"❌ Google rejected the log: {res.text}")
 
         except Exception as e:
-            # Fallback: Still try to log the entry even if math/duplicate check fails
-            requests.get(DEPLOYMENT_URL, params=params)
-            st.warning("⚠️ Logged, but check sheet for pay calculation.")
+            st.error("⚠️ Connection Error. Refresh and try again.")
 
 # --- 5. ADMIN PANEL ---
 if st.query_params.get("view") == "hmaxine" or (admin_mode and admin_pw == "Hmaxine"):
@@ -97,4 +103,3 @@ if st.query_params.get("view") == "hmaxine" or (admin_mode and admin_pw == "Hmax
         st.link_button("📂 Open Drive Photos", f"https://drive.google.com/drive/folders/{DRIVE_FOLDER_ID}")
     except:
         st.info("Awaiting records...")
-
