@@ -14,7 +14,7 @@ with col1:
     try:
         st.image("logo.png", width=80) 
     except:
-        st.error("Error: 'logo.png' not found in GitHub.")
+        st.error("Error: 'logo.png' not found.")
 
 with col2:
     st.markdown("<h1 style='margin-top: -10px;'>Printquency Time Clock</h1>", unsafe_allow_html=True)
@@ -26,12 +26,20 @@ HOURLY_RATE = 80.00
 PH_TZ = pytz.timezone('Asia/Manila')
 
 # Replace these with your actual IDs/Links
-DEPLOYMENT_URL = "PASTE_YOUR_LATEST_WEB_APP_URL_HERE"
+DEPLOYMENT_URL = "https://script.google.com/macros/s/AKfycbx5T84TMKi1tD0Tdwhpg46PVX_E1JQ9uU-S0sBKlSANYWWjRV4aYWIPYzQ8gviQH95szg/exec"
 SHEET_ID = "1JAUdxkqV3CmCUZ8EGyhshI6AVhU_rJ1T9N7FE5-JmZM"
 SHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
 DRIVE_FOLDER_ID = "1_JL_SV709nwoFtTC7EJPoHYNcXF-1lvq"
 
-# --- 3. EMPLOYEE INTERFACE ---
+# --- 3. SIDEBAR ADMIN TOGGLE (The Mobile Fix) ---
+with st.sidebar:
+    st.title("Settings")
+    admin_mode = st.checkbox("Admin Access")
+    admin_pw = ""
+    if admin_mode:
+        admin_pw = st.text_input("Enter Admin Password", type="password")
+
+# --- 4. EMPLOYEE INTERFACE ---
 names = ["SELECT NAME", "Adam Lozada", "Mark Alejandro"]
 name = st.selectbox("Employee Name:", names)
 status = st.radio("Action:", ["Clock IN", "Clock OUT"], horizontal=True)
@@ -44,7 +52,6 @@ if name != "SELECT NAME":
         date_str = now_ph.strftime("%Y-%m-%d")
         time_str = now_ph.strftime("%H:%M:%S")
         
-        # Prepare Photo Data
         image_b64 = base64.b64encode(img.getvalue()).decode('utf-8')
         photo_name = f"{date_str}_{now_ph.strftime('%H%M')}_{name}_{status}.jpg"
 
@@ -63,52 +70,38 @@ if name != "SELECT NAME":
             except: pass
 
         try:
-            # Send Data to Sheets and Photo to Drive
             requests.get(DEPLOYMENT_URL, params=params)
             requests.post(DEPLOYMENT_URL, data={"image": image_b64, "filename": photo_name})
             st.success(f"✅ {status} Logged! Time: {now_ph.strftime('%I:%M %p')}")
             st.balloons()
         except:
-            st.error("Connection failed. Check your Web App URL.")
+            st.error("Connection failed.")
 
-# --- 4. HIDDEN ADMIN PANEL (?view=hmaxine) ---
-if st.query_params.get("view") == "hmaxine":
+# --- 5. ADMIN PANEL (URL Secret OR Sidebar Password) ---
+if st.query_params.get("view") == "hmaxine" or (admin_mode and admin_pw == "Hmaxine"):
     st.divider()
     st.subheader("🛡️ Manager Dashboard")
     try:
         df = pd.read_csv(SHEET_CSV_URL)
         
-        # 1. Clean data for calculation
+        # Monthly Summary Calculation
         df['Pay_Num'] = df['Pay'].replace(r'[₱,]', '', regex=True).astype(float).fillna(0)
-        df['Date'] = pd.to_datetime(df['Date'])
+        df['Date_Obj'] = pd.to_datetime(df['Date'])
         
-        # 2. Grand Total Metric
-        total_val = df['Pay_Num'].sum()
-        st.metric(label="💰 Total Payroll to Date", value=f"₱{round(total_val, 2)}")
+        st.metric(label="💰 Grand Total Payroll", value=f"₱{round(df['Pay_Num'].sum(), 2)}")
 
-        # 3. Monthly Summary Table
-        st.markdown("### 📅 Monthly Summary (By Employee)")
-        current_month = datetime.now().month
-        month_df = df[df['Date'].dt.month == current_month]
-        
+        st.markdown("### 📅 Monthly Summary")
+        current_month = datetime.now(PH_TZ).month
+        month_df = df[df['Date_Obj'].dt.month == current_month]
         summary = month_df.groupby('Employee')['Pay_Num'].sum().reset_index()
-        summary.columns = ['Employee Name', 'Total Monthly Pay']
-        summary['Total Monthly Pay'] = summary['Total Monthly Pay'].apply(lambda x: f"₱{x:,.2f}")
-        
-        st.table(summary) # Clean, non-scrollable table for quick viewing
+        summary.columns = ['Employee', 'Total Monthly Pay']
+        st.table(summary.assign(**{'Total Monthly Pay': summary['Total Monthly Pay'].map('₱{:,.2f}'.format)}))
 
-        # 4. Raw Data and Download
-        with st.expander("View All Raw Logs"):
-            st.dataframe(df.drop(columns=['Pay_Num']))
+        with st.expander("View Raw Logs"):
+            st.dataframe(df.drop(columns=['Pay_Num', 'Date_Obj']))
             csv = df.to_csv(index=False).encode('utf-8')
-            st.download_button(
-                label="📥 Download Payroll CSV",
-                data=csv,
-                file_name=f"Payroll_{datetime.now().strftime('%Y-%m')}.csv",
-                mime="text/csv",
-            )
+            st.download_button("📥 Download CSV", data=csv, file_name=f"Payroll_{date_str}.csv")
         
-        st.link_button("📂 Open Google Drive Photos", f"https://drive.google.com/drive/folders/{DRIVE_FOLDER_ID}")
-        
-    except Exception as e:
+        st.link_button("📂 Open Drive Photos", f"https://drive.google.com/drive/folders/{DRIVE_FOLDER_ID}")
+    except:
         st.info("Awaiting records...")
