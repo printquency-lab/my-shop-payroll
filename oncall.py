@@ -77,20 +77,38 @@ if st.query_params.get("view") == "hmaxine":
     st.subheader("🛡️ Manager Dashboard")
     try:
         df = pd.read_csv(SHEET_CSV_URL)
-        if 'Pay' in df.columns:
-            total_val = df['Pay'].replace(r'[₱,]', '', regex=True).astype(float).sum()
-            st.metric(label="💰 Total Payroll to Date", value=f"₱{round(total_val, 2)}")
         
-        st.dataframe(df)
+        # 1. Clean data for calculation
+        df['Pay_Num'] = df['Pay'].replace(r'[₱,]', '', regex=True).astype(float).fillna(0)
+        df['Date'] = pd.to_datetime(df['Date'])
+        
+        # 2. Grand Total Metric
+        total_val = df['Pay_Num'].sum()
+        st.metric(label="💰 Total Payroll to Date", value=f"₱{round(total_val, 2)}")
 
-        # Download CSV Button
-        csv = df.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="📥 Download Payroll CSV",
-            data=csv,
-            file_name=f"Payroll_{date_str}.csv",
-            mime="text/csv",
-        )
+        # 3. Monthly Summary Table
+        st.markdown("### 📅 Monthly Summary (By Employee)")
+        current_month = datetime.now().month
+        month_df = df[df['Date'].dt.month == current_month]
+        
+        summary = month_df.groupby('Employee')['Pay_Num'].sum().reset_index()
+        summary.columns = ['Employee Name', 'Total Monthly Pay']
+        summary['Total Monthly Pay'] = summary['Total Monthly Pay'].apply(lambda x: f"₱{x:,.2f}")
+        
+        st.table(summary) # Clean, non-scrollable table for quick viewing
+
+        # 4. Raw Data and Download
+        with st.expander("View All Raw Logs"):
+            st.dataframe(df.drop(columns=['Pay_Num']))
+            csv = df.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Download Payroll CSV",
+                data=csv,
+                file_name=f"Payroll_{datetime.now().strftime('%Y-%m')}.csv",
+                mime="text/csv",
+            )
+        
         st.link_button("📂 Open Google Drive Photos", f"https://drive.google.com/drive/folders/{DRIVE_FOLDER_ID}")
-    except:
+        
+    except Exception as e:
         st.info("Awaiting records...")
