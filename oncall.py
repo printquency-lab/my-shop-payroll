@@ -99,3 +99,4 @@ if st.query_params.get("view") == "hmaxine" or (admin_mode and admin_pw == "Hmax
         st.link_button("📂 Open Drive Photos", f"https://drive.google.com/drive/folders/{DRIVE_FOLDER_ID}")
     except:
         st.info("Dashboard waiting for data...")
+
