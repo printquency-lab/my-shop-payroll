@@ -8,18 +8,15 @@ import base64
 # --- 1. SETUP & BRANDING ---
 st.set_page_config(page_title="Printquency", page_icon="logo.png")
 
-# Using columns to align Logo and Title on the same line
+# Logo and Title Alignment
 col1, col2 = st.columns([1, 6]) 
-
 with col1:
     try:
-        # Reduced width to 80 to match the text height perfectly
         st.image("logo.png", width=80) 
     except:
-        st.error("Error loading logo.png")
+        st.error("Error: 'logo.png' not found in GitHub.")
 
 with col2:
-    # This aligns the text vertically with the logo
     st.markdown("<h1 style='margin-top: -10px;'>Printquency Time Clock</h1>", unsafe_allow_html=True)
 
 st.divider()
@@ -28,9 +25,11 @@ st.divider()
 HOURLY_RATE = 80.00
 PH_TZ = pytz.timezone('Asia/Manila')
 
-DEPLOYMENT_URL = "https://script.google.com/macros/s/AKfycbx5T84TMKi1tD0Tdwhpg46PVX_E1JQ9uU-S0sBKlSANYWWjRV4aYWIPYzQ8gviQH95szg/exec"
+# Replace these with your actual IDs/Links
+DEPLOYMENT_URL = "PASTE_YOUR_LATEST_WEB_APP_URL_HERE"
 SHEET_ID = "1JAUdxkqV3CmCUZ8EGyhshI6AVhU_rJ1T9N7FE5-JmZM"
 SHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
+DRIVE_FOLDER_ID = "1_JL_SV709nwoFtTC7EJPoHYNcXF-1lvq"
 
 # --- 3. EMPLOYEE INTERFACE ---
 names = ["SELECT NAME", "Adam Lozada", "Mark Alejandro"]
@@ -45,7 +44,7 @@ if name != "SELECT NAME":
         date_str = now_ph.strftime("%Y-%m-%d")
         time_str = now_ph.strftime("%H:%M:%S")
         
-        # Prepare Photo for Google Drive
+        # Prepare Photo Data
         image_b64 = base64.b64encode(img.getvalue()).decode('utf-8')
         photo_name = f"{date_str}_{now_ph.strftime('%H%M')}_{name}_{status}.jpg"
 
@@ -64,6 +63,7 @@ if name != "SELECT NAME":
             except: pass
 
         try:
+            # Send Data to Sheets and Photo to Drive
             requests.get(DEPLOYMENT_URL, params=params)
             requests.post(DEPLOYMENT_URL, data={"image": image_b64, "filename": photo_name})
             st.success(f"✅ {status} Logged! Time: {now_ph.strftime('%I:%M %p')}")
@@ -71,7 +71,7 @@ if name != "SELECT NAME":
         except:
             st.error("Connection failed. Check your Web App URL.")
 
-# --- 4. HIDDEN ADMIN PANEL ---
+# --- 4. HIDDEN ADMIN PANEL (?view=hmaxine) ---
 if st.query_params.get("view") == "hmaxine":
     st.divider()
     st.subheader("🛡️ Manager Dashboard")
@@ -80,8 +80,17 @@ if st.query_params.get("view") == "hmaxine":
         if 'Pay' in df.columns:
             total_val = df['Pay'].replace(r'[₱,]', '', regex=True).astype(float).sum()
             st.metric(label="💰 Total Payroll to Date", value=f"₱{round(total_val, 2)}")
+        
         st.dataframe(df)
+
+        # Download CSV Button
+        csv = df.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Download Payroll CSV",
+            data=csv,
+            file_name=f"Payroll_{date_str}.csv",
+            mime="text/csv",
+        )
+        st.link_button("📂 Open Google Drive Photos", f"https://drive.google.com/drive/folders/{DRIVE_FOLDER_ID}")
     except:
         st.info("Awaiting records...")
-
-
