@@ -1,50 +1,34 @@
-import streamlit as st
-from datetime import datetime
-import pandas as pd
-import os
-
-st.set_page_config(page_title="Shop Time-Clock", page_icon="⏰")
-
-st.title("🇵🇭 Shop Time-Clock")
-
-# 1. Employee Selection
-employee_list = ["SELECT NAME", "Adam Lozada", "Mark Alejandro"]
-name = st.selectbox("Your Name:", employee_list)
-
-# 2. Status Selection (IN or OUT)
-status = st.radio("What are you doing?", ["Clock IN", "Clock OUT"], horizontal=True)
-
-if name != "SELECT NAME":
-    st.info(f"Hello {name}, taking photo for {status}...")
-    img = st.camera_input("Smile for the camera!")
-    
-    if img:
-        now = datetime.now()
-        new_data = {
-            "Date": now.strftime("%Y-%m-%d"),
-            "Time": now.strftime("%H:%M:%S"),
-            "Employee": name,
-            "Status": status # Now records if they are In or Out
-        }
-        
-        file = "Payroll_Master_Tracker.csv"
-        df_new = pd.DataFrame([new_data])
-        
-        if os.path.exists(file):
-            df_old = pd.read_csv(file)
-            df_final = pd.concat([df_old, df_new], ignore_index=True)
-        else:
-            df_final = df_new
-            
-        df_final.to_csv(file, index=False)
-        st.success(f"✅ {status} recorded for {name} at {new_data['Time']}")
-        st.balloons()
-
-# --- ADMIN SECTION ---
-st.divider()
-if st.checkbox("Admin: Show Records"):
+# --- ADD THIS TO YOUR ADMIN SECTION ---
+if st.checkbox("Admin: View Computed Payroll"):
     if os.path.exists("Payroll_Master_Tracker.csv"):
-        df_view = pd.read_csv("Payroll_Master_Tracker.csv")
-        st.dataframe(df_view)
-        with open("Payroll_Master_Tracker.csv", "rb") as f:
-            st.download_button("📥 Download Records", f, file_name="payroll_logs.csv")
+        df = pd.read_csv("Payroll_Master_Tracker.csv")
+        
+        # Convert Time to actual numbers for math
+        df['Time'] = pd.to_datetime(df['Time'], format='%H:%M:%S')
+        
+        # Group by Date and Employee
+        summary = []
+        for (date, emp), group in df.groupby(['Date', 'Employee']):
+            ins = group[group['Status'] == 'Clock IN']
+            outs = group[group['Status'] == 'Clock OUT']
+            
+            if not ins.empty and not outs.empty:
+                start = ins['Time'].iloc[0]
+                end = outs['Time'].iloc[-1]
+                duration = (end - start).seconds / 3600
+                
+                # Apply your Shop Rate (₱61.38 from your payslip)
+                rate = 61.38
+                pay = duration * rate
+                
+                summary.append({
+                    "Date": date,
+                    "Employee": emp,
+                    "Total Hours": round(duration, 2),
+                    "Pay (PHP)": round(pay, 2)
+                })
+        
+        if summary:
+            st.table(pd.DataFrame(summary))
+        else:
+            st.info("Need both an 'IN' and an 'OUT' log for the same day to compute.")
