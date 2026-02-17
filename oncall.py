@@ -26,6 +26,7 @@ if selected_name != "SELECT NAME":
         # 3. LOGGING BUTTON
         if st.button(f"Confirm Clock-In/Out for {selected_name}"):
             # Logic for Payroll Calculations
+            
             now = datetime.now()
             date_str = now.strftime("%Y-%m-%d")
             time_str = now.strftime("%H:%M:%S")
@@ -56,3 +57,35 @@ else:
 # Footer for the Boss
 st.divider()
 st.caption("Admin Note: All photos and timestamps are recorded in the Master Tracker.")
+st.divider()
+if st.checkbox("Admin: Show Download Link"):
+    if os.path.exists("Payroll_Master_Tracker.csv"):
+        with open("Payroll_Master_Tracker.csv", "rb") as file:
+            st.download_button(
+                label="Download Master Payroll CSV",
+                data=file,
+                file_name="Shop_Master_Records.csv",
+                mime="text/csv"
+            )
+    else:
+        st.write("No records found yet.")
+import pandas as pd
+
+st.divider()
+st.subheader("Admin Section")
+# Use a simple password so employees don't download your payroll!
+if st.text_input("Enter Admin Password", type="password") == "shop2026":
+    if os.path.exists("Payroll_Master_Tracker.csv"):
+        with open("Payroll_Master_Tracker.csv", "rb") as file:
+            st.download_button(
+                label="📥 Download Master Payroll File",
+                data=file,
+                file_name="Shop_Payroll_Master.csv",
+                mime="text/csv"
+            )
+        
+        # Also show the table live in the app
+        df = pd.read_csv("Payroll_Master_Tracker.csv")
+        st.dataframe(df)
+    else:
+        st.info("No logs recorded yet.")
