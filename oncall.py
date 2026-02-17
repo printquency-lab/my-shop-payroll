@@ -6,18 +6,19 @@ import pytz
 import base64
 
 # --- 1. SETUP & BRANDING ---
-# page_icon sets the browser tab icon
 st.set_page_config(page_title="Printquency", page_icon="logo.png")
 
-# Displays your logo at the top
-st.image("logo.png", width=150) 
-st.header("Printquency Time Clock", divider="blue")
+# Centering the logo for a cleaner look
+col1, col2, col3 = st.columns([1, 2, 1])
+with col2:
+    st.image("logo.png", width=150)
+
+st.header("🖨️ Printquency Time Clock", divider="blue")
 
 # --- 2. CONFIGURATION ---
 HOURLY_RATE = 80.00
 PH_TZ = pytz.timezone('Asia/Manila')
 
-# Replace these with your actual links/IDs
 DEPLOYMENT_URL = "PASTE_YOUR_WEB_APP_URL_HERE"
 SHEET_ID = "1JAUdxkqV3CmCUZ8EGyhshI6AVhU_rJ1T9N7FE5-JmZM"
 SHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
@@ -35,55 +36,44 @@ if name != "SELECT NAME":
         date_str = now_ph.strftime("%Y-%m-%d")
         time_str = now_ph.strftime("%H:%M:%S")
         
-        # Prepare Photo for Google Drive
         image_b64 = base64.b64encode(img.getvalue()).decode('utf-8')
         photo_name = f"{date_str}_{now_ph.strftime('%H%M')}_{name}_{status}.jpg"
 
-        params = {
-            "Date": date_str, "Time": time_str, 
-            "Employee": name, "Status": status, 
-            "Hours": "", "Pay": ""
-        }
+        params = {"Date": date_str, "Time": time_str, "Employee": name, "Status": status, "Hours": "", "Pay": ""}
 
-        # Calculate Payroll Logic on Clock OUT
         if status == "Clock OUT":
             try:
                 df = pd.read_csv(SHEET_CSV_URL)
                 match = df[(df['Date'] == date_str) & (df['Employee'] == name) & (df['Clock OUT'].isna())]
                 if not match.empty:
-                    # pd.to_datetime handles 24-hour math correctly
                     t_in = pd.to_datetime(match.iloc[-1]['Clock IN'])
-                    t_out = pd.to_datetime(time_str)
-                    hrs = (t_out - t_in).total_seconds() / 3600
-                    
-                    # 1-Hour Lunch Rule for shifts over 5 hours
-                    if hrs > 5:
-                        hrs -= 1
-                    
+                    hrs = (pd.to_datetime(time_str) - t_in).total_seconds() / 3600
+                    if hrs > 5: hrs -= 1 
                     params["Hours"] = round(hrs, 2)
                     params["Pay"] = f"₱{round(hrs * HOURLY_RATE, 2)}"
-            except:
-                pass
+            except: pass
 
-        # Send Data to Sheets & Photo to Drive
         try:
             requests.get(DEPLOYMENT_URL, params=params)
             requests.post(DEPLOYMENT_URL, data={"image": image_b64, "filename": photo_name})
-            st.success(f"✅ {status} Logged! Time: {now_ph.strftime('%I:%M %p')}")
+            st.success(f"✅ {status} Logged! Hello, {name}.")
             st.balloons()
         except:
-            st.error("Connection failed. Check your Deployment URL.")
+            st.error("Connection error.")
 
-# --- 4. ADMIN PANEL ---
-st.divider()
-with st.expander("🛡️ Admin Panel"):
-    pw = st.text_input("Password", type="password")
-    if pw == "Hmaxine":
-        try:
-            df = pd.read_csv(SHEET_CSV_URL)
-            if 'Pay' in df.columns:
-                total_val = df['Pay'].replace(r'[₱,]', '', regex=True).astype(float).sum()
-                st.metric(label="💰 Grand Total Payroll", value=f"₱{round(total_val, 2)}")
-            st.dataframe(df)
-        except:
-            st.info("Awaiting records...")
+# --- 4. HIDDEN ADMIN PANEL ---
+# This section only appears if the URL ends with ?view=hmaxine
+query_params = st.query_params
+if query_params.get("view") == "hmaxine":
+    st.divider()
+    st.subheader("🛡️ Manager Dashboard")
+    try:
+        df = pd.read_csv(SHEET_CSV_URL)
+        if 'Pay' in df.columns:
+            # Clean currency for calculation
+            total_val = df['Pay'].replace(r'[₱,]', '', regex=True).astype(float).sum()
+            st.metric(label="💰 Total Weekly Payroll", value=f"₱{round(total_val, 2)}")
+        st.dataframe(df)
+        st.link_button("📂 Open Google Drive Folder", "PASTE_YOUR_DRIVE_FOLDER_LINK_HERE")
+    except:
+        st.info("No data available.")
