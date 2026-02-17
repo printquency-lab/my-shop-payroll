@@ -24,21 +24,12 @@ st.divider()
 HOURLY_RATE = 80.00
 PH_TZ = pytz.timezone('Asia/Manila')
 
-# IMPORTANT: Check that these IDs match your setup exactly
+# IMPORTANT: Double-check these three IDs
 DEPLOYMENT_URL = "https://script.google.com/macros/s/AKfycbzx-yvh38TY7-6Ul9pSVJ9Hb-SNM19jJusS7KzhXC76eC2aTZBnzmeQZFhZmrWCGJVT/exec"
 SHEET_ID = "1JAUdxkqV3CmCUZ8EGyhshI6AVhU_rJ1T9N7FE5-JmZM"
 SHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
-DRIVE_FOLDER_ID = "1_JL_SV709nwoFtTC7EJPoHYNcXF-1lvq"
 
-# --- 3. SIDEBAR ADMIN ---
-with st.sidebar:
-    st.title("Settings")
-    admin_mode = st.checkbox("Admin Access")
-    admin_pw = ""
-    if admin_mode:
-        admin_pw = st.text_input("Enter Admin Password", type="password")
-
-# --- 4. EMPLOYEE INTERFACE ---
+# --- 3. EMPLOYEE INTERFACE ---
 names = ["SELECT NAME", "Adam Lozada", "Mark Alejandro"]
 name = st.selectbox("Employee Name:", names)
 status = st.radio("Action:", ["Clock IN", "Clock OUT"], horizontal=True)
@@ -56,47 +47,42 @@ if name != "SELECT NAME":
         params = {"Date": date_str, "Time": time_str, "Employee": name, "Status": status, "Hours": "", "Pay": ""}
 
         try:
-            # Load sheet to calculate math
+            # 1. Fetch current data for math
             df = pd.read_csv(SHEET_CSV_URL)
             
             if status == "Clock OUT":
-                # Find the open Clock IN for today
+                # Find Adam/Mark's current session
                 match = df[(df['Date'] == date_str) & (df['Employee'] == name) & (df['Clock OUT'].isna())]
                 if not match.empty:
                     t_in = pd.to_datetime(match.iloc[-1]['Clock IN'])
                     t_out = pd.to_datetime(time_str)
                     hrs = (t_out - t_in).total_seconds() / 3600
-                    if hrs > 5: hrs -= 1 # Auto-lunch
+                    if hrs > 5: hrs -= 1 # Auto-Lunch
                     params["Hours"] = round(hrs, 2)
                     params["Pay"] = f"₱{round(hrs * HOURLY_RATE, 2)}"
 
-            # SUBMIT TO GOOGLE
+            # 2. Submit to Google
             res = requests.get(DEPLOYMENT_URL, params=params, timeout=15)
             payload = {"image": image_b64, "filename": photo_name}
             requests.post(DEPLOYMENT_URL, json=payload, timeout=15)
 
             if "SYNC_OK" in res.text or "Success" in res.text:
-                st.success(f"✅ {status} Synced!")
+                st.success(f"✅ {status} Synced! Data is safe.")
                 st.balloons()
             else:
-                st.warning("⚠️ Logged, but please check the sheet.")
+                st.warning("⚠️ Data sent, but check sheet for Pay calculation.")
 
         except Exception as e:
-            st.error("Connection Error. Please verify your Web App URL.")
+            st.error(f"Error: {e}. Please check your Web App URL deployment.")
 
-# --- 5. ADMIN PANEL ---
-if st.query_params.get("view") == "hmaxine" or (admin_mode and admin_pw == "Hmaxine"):
-    st.divider()
-    st.subheader("🛡️ Manager Dashboard")
-    try:
-        # Re-fetch data for the dashboard
-        df_admin = pd.read_csv(SHEET_CSV_URL)
-        # Clean the 'Pay' column so it can be summed
-        df_admin['Pay_Num'] = df_admin['Pay'].replace(r'[₱,]', '', regex=True).astype(float).fillna(0)
-        
-        st.metric(label="💰 Total Payroll Recorded", value=f"₱{round(df_admin['Pay_Num'].sum(), 2)}")
-        st.dataframe(df_admin[['Date', 'Employee', 'Clock In', 'Clock OUT', 'Hours', 'Pay']])
-        st.link_button("📂 Open Drive Photos", f"https://drive.google.com/drive/folders/{DRIVE_FOLDER_ID}")
-    except:
-        st.info("Dashboard waiting for data...")
-
+# --- 4. MANAGER DASHBOARD ---
+st.divider()
+st.subheader("🛡️ Manager Dashboard")
+try:
+    df_admin = pd.read_csv(SHEET_CSV_URL)
+    # This part shows the money again
+    df_admin['Pay_Num'] = df_admin['Pay'].replace(r'[₱,]', '', regex=True).astype(float).fillna(0)
+    st.metric(label="💰 Total Payroll Recorded", value=f"₱{round(df_admin['Pay_Num'].sum(), 2)}")
+    st.dataframe(df_admin)
+except:
+    st.info("Waiting for first entry to load dashboard...")
