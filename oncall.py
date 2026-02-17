@@ -24,6 +24,7 @@ st.divider()
 HOURLY_RATE = 80.00
 PH_TZ = pytz.timezone('Asia/Manila')
 
+# Replace these with your actual IDs/Links
 DEPLOYMENT_URL = "https://script.google.com/macros/s/AKfycbx5T84TMKi1tD0Tdwhpg46PVX_E1JQ9uU-S0sBKlSANYWWjRV4aYWIPYzQ8gviQH95szg/exec"
 SHEET_ID = "1JAUdxkqV3CmCUZ8EGyhshI6AVhU_rJ1T9N7FE5-JmZM"
 SHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
@@ -55,15 +56,19 @@ if name != "SELECT NAME":
 
         params = {"Date": date_str, "Time": time_str, "Employee": name, "Status": status, "Hours": "", "Pay": ""}
 
-       try:
+        try:
             # Load sheet to check for status
             df_check = pd.read_csv(SHEET_CSV_URL)
             
             # --- ANTI-DUPLICATE GUARD ---
             last_entry = df_check[(df_check['Employee'] == name) & (df_check['Date'] == date_str)].tail(1)
+            
+            is_duplicate = False
             if not last_entry.empty and last_entry.iloc[0]['Status'] == status:
-                st.warning(f"⚠️ You already clicked {status}!")
-            else:
+                st.warning(f"⚠️ Action already recorded! You are already {status}ed.")
+                is_duplicate = True
+
+            if not is_duplicate:
                 # --- CALCULATION LOGIC ---
                 if status == "Clock OUT":
                     # Look for the last 'Clock IN' that doesn't have an OUT yet
@@ -77,15 +82,18 @@ if name != "SELECT NAME":
                         params["Pay"] = f"₱{round(hrs * HOURLY_RATE, 2)}"
 
                 # --- SUBMIT DATA ---
-                requests.get(DEPLOYMENT_URL, params=params)
-                requests.post(DEPLOYMENT_URL, data={"image": image_b64, "filename": photo_name})
-                st.success(f"✅ {status} Successful!")
+                requests.get(DEPLOYMENT_URL, params=params, timeout=10)
+                requests.post(DEPLOYMENT_URL, data={"image": image_b64, "filename": photo_name}, timeout=10)
+                
+                # Success Messages
+                if status == "Clock IN":
+                    st.success(f"⚡ Good luck today, {name}!")
+                else:
+                    st.success(f"🏁 Great work, {name}!")
                 st.balloons()
 
         except Exception as e:
-            # If the calculation fails, still try to log the time so Mark doesn't get stuck
-            requests.get(DEPLOYMENT_URL, params=params)
-            st.warning("⚠️ Logged, but could not calculate pay automatically. Check sheet.")
+            st.error("Connection slow. Check the sheet in a moment to see if it saved.")
 
 # --- 5. ADMIN PANEL ---
 if st.query_params.get("view") == "hmaxine" or (admin_mode and admin_pw == "Hmaxine"):
@@ -111,5 +119,3 @@ if st.query_params.get("view") == "hmaxine" or (admin_mode and admin_pw == "Hmax
         st.link_button("📂 Open Drive Photos", f"https://drive.google.com/drive/folders/{DRIVE_FOLDER_ID}")
     except:
         st.info("Awaiting records...")
-
-
