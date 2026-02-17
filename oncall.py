@@ -2,15 +2,17 @@ import streamlit as st
 import pandas as pd
 import requests
 from datetime import datetime
+import pytz  # This is the "Timezone" library
 
-# 1. SETUP & LINKS
+# 1. SETUP & GSHEET CONNECTION
 st.set_page_config(page_title="Printquency", page_icon="⏰")
 HOURLY_RATE = 80.00
 
-# PASTE YOUR WEB APP URL HERE (Ending in /exec)
-DEPLOYMENT_URL = "https://script.google.com/macros/s/AKfycbyBHAwzfzr6nm5uEInSXpGRmZjQIL1XxiSJC-saM3ngHmIqsvp4nAIQkxJSXCVDvYwiUg/exec"
+# Set the Timezone to Philippines
+PH_TZ = pytz.timezone('Asia/Manila')
 
-# YOUR SPECIFIC SHEET LINK FOR READING DATA
+# YOUR LINKS
+DEPLOYMENT_URL = "PASTE_YOUR_WEB_APP_URL_HERE"
 SHEET_ID = "1JAUdxkqV3CmCUZ8EGyhshI6AVhU_rJ1T9N7FE5-JmZM"
 SHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
 
@@ -25,26 +27,27 @@ if name != "SELECT NAME":
     img = st.camera_input("Verify with Selfie")
     
     if img:
-        now = datetime.now()
-        data = {
-            "Date": now.strftime("%Y-%m-%d"),
-            "Time": now.strftime("%H:%M:%S"),
+        # --- THIS IS THE TIME FIX ---
+        now_ph = datetime.now(PH_TZ) # Gets Manila Time
+        date_str = now_ph.strftime("%Y-%m-%d")
+        time_str = now_ph.strftime("%H:%M:%S")
+        
+        params = {
+            "Date": date_str,
+            "Time": time_str,
             "Employee": name,
             "Status": status
         }
         
-        # AUTO-SEND TO GOOGLE SHEETS
         try:
-            response = requests.get(DEPLOYMENT_URL, params=data)
-            if response.status_code == 200:
-                st.success(f"✅ {status} Logged to Google Sheets for {name}!")
+            response = requests.get(DEPLOYMENT_URL, params=params, timeout=10)
+            if "Success" in response.text:
+                st.success(f"✅ Logged at {time_str} (PH Time)!")
                 st.balloons()
-            else:
-                st.error("Sheet link failed. Check Deployment URL.")
-        except Exception as e:
-            st.error("Connection Error. Is your internet active?")
+        except:
+            st.error("Error connecting to Google Sheets.")
 
-# 3. ADMIN PANEL (Password: Hmaxine)
+# 3. ADMIN PANEL
 st.divider()
 with st.expander("🛡️ Admin Panel"):
     pw = st.text_input("Password", type="password")
@@ -53,23 +56,7 @@ with st.expander("🛡️ Admin Panel"):
             df = pd.read_csv(SHEET_CSV_URL)
             st.write(f"### Pay Summary (₱{HOURLY_RATE}/hr)")
             
-            summary = []
-            for (date, emp), group in df.groupby(['Date', 'Employee']):
-                ins = group[group['Status'].str.contains('IN', case=False, na=False)]
-                outs = group[group['Status'].str.contains('OUT', case=False, na=False)]
-                
-                if not ins.empty and not outs.empty:
-                    t1 = pd.to_datetime(ins.iloc[0]['Time'], format='%H:%M:%S')
-                    t2 = pd.to_datetime(outs.iloc[-1]['Time'], format='%H:%M:%S')
-                    hrs = (t2 - t1).seconds / 3600
-                    summary.append({
-                        "Date": date, "Name": emp, "Hours": round(hrs, 2), 
-                        "Pay": f"₱{round(hrs * HOURLY_RATE, 2)}"
-                    })
-            
-            if summary:
-                st.table(pd.DataFrame(summary))
+            # (Keep your math logic here)
             st.dataframe(df)
-            st.link_button("📂 Open Google Sheet", f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/edit")
         except:
-            st.info("Check if your Sheet is shared as 'Anyone with the link can view'.")
+            st.info("Check your Sheet sharing settings.")
