@@ -25,7 +25,7 @@ HOURLY_RATE = 80.00
 PH_TZ = pytz.timezone('Asia/Manila')
 
 # IMPORTANT: Ensure this is your NEW Deployment URL from the Apps Script
-DEPLOYMENT_URL = "https://script.google.com/macros/s/AKfycbwxKyz_BswpQfFOt-b2of58KK16n1k0giga8p5FgaseUBYYgjIEQ54YuCva2aElY2Bacw/exec"
+DEPLOYMENT_URL = "https://script.google.com/macros/s/AKfycbzx-yvh38TY7-6Ul9pSVJ9Hb-SNM19jJusS7KzhXC76eC2aTZBnzmeQZFhZmrWCGJVT/exec"
 SHEET_ID = "1JAUdxkqV3CmCUZ8EGyhshI6AVhU_rJ1T9N7FE5-JmZM"
 SHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
 DRIVE_FOLDER_ID = "1_JL_SV709nwoFtTC7EJPoHYNcXF-1lvq"
@@ -103,3 +103,4 @@ if st.query_params.get("view") == "hmaxine" or (admin_mode and admin_pw == "Hmax
         st.link_button("📂 Open Drive Photos", f"https://drive.google.com/drive/folders/{DRIVE_FOLDER_ID}")
     except:
         st.info("Awaiting records...")
+
