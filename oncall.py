@@ -28,7 +28,7 @@ st.divider()
 HOURLY_RATE = 80.00
 PH_TZ = pytz.timezone('Asia/Manila')
 
-DEPLOYMENT_URL = "PASTE_YOUR_WEB_APP_URL_HERE"
+DEPLOYMENT_URL = "https://script.google.com/macros/s/AKfycbzvT7GP6ZdFkk_WeyvDQEI1Bm892n-fd7C593nHfeJuvOdx-R99x2YyXlTAKM9ZrkINAA/exec"
 SHEET_ID = "1JAUdxkqV3CmCUZ8EGyhshI6AVhU_rJ1T9N7FE5-JmZM"
 SHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
 
@@ -83,3 +83,4 @@ if st.query_params.get("view") == "hmaxine":
         st.dataframe(df)
     except:
         st.info("Awaiting records...")
+
