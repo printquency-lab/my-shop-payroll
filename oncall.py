@@ -24,7 +24,7 @@ st.divider()
 HOURLY_RATE = 80.00
 PH_TZ = pytz.timezone('Asia/Manila')
 
-# IMPORTANT: Ensure this is your NEW Deployment URL from the Apps Script
+# IMPORTANT: Check that these IDs match your setup exactly
 DEPLOYMENT_URL = "https://script.google.com/macros/s/AKfycbzx-yvh38TY7-6Ul9pSVJ9Hb-SNM19jJusS7KzhXC76eC2aTZBnzmeQZFhZmrWCGJVT/exec"
 SHEET_ID = "1JAUdxkqV3CmCUZ8EGyhshI6AVhU_rJ1T9N7FE5-JmZM"
 SHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
@@ -56,51 +56,46 @@ if name != "SELECT NAME":
         params = {"Date": date_str, "Time": time_str, "Employee": name, "Status": status, "Hours": "", "Pay": ""}
 
         try:
-            # 1. Load data to check status/duplicates
-            df_check = pd.read_csv(SHEET_CSV_URL)
-            last_entry = df_check[(df_check['Employee'] == name) & (df_check['Date'] == date_str)].tail(1)
+            # Load sheet to calculate math
+            df = pd.read_csv(SHEET_CSV_URL)
             
-            # 2. Duplicate Check
-            if not last_entry.empty and last_entry.iloc[0]['Status'] == status:
-                st.warning(f"⚠️ You already clicked {status} for today.")
+            if status == "Clock OUT":
+                # Find the open Clock IN for today
+                match = df[(df['Date'] == date_str) & (df['Employee'] == name) & (df['Clock OUT'].isna())]
+                if not match.empty:
+                    t_in = pd.to_datetime(match.iloc[-1]['Clock IN'])
+                    t_out = pd.to_datetime(time_str)
+                    hrs = (t_out - t_in).total_seconds() / 3600
+                    if hrs > 5: hrs -= 1 # Auto-lunch
+                    params["Hours"] = round(hrs, 2)
+                    params["Pay"] = f"₱{round(hrs * HOURLY_RATE, 2)}"
+
+            # SUBMIT TO GOOGLE
+            res = requests.get(DEPLOYMENT_URL, params=params, timeout=15)
+            payload = {"image": image_b64, "filename": photo_name}
+            requests.post(DEPLOYMENT_URL, json=payload, timeout=15)
+
+            if "SYNC_OK" in res.text or "Success" in res.text:
+                st.success(f"✅ {status} Synced!")
+                st.balloons()
             else:
-                # 3. Calculate Pay for Clock Out
-                if status == "Clock OUT":
-                    match = df_check[(df_check['Date'] == date_str) & (df_check['Employee'] == name) & (df_check['Clock OUT'].isna())]
-                    if not match.empty:
-                        t_in = pd.to_datetime(match.iloc[-1]['Clock IN'])
-                        t_out = pd.to_datetime(time_str)
-                        hrs = (t_out - t_in).total_seconds() / 3600
-                        if hrs > 5: hrs -= 1 # Auto-Lunch
-                        params["Hours"] = round(hrs, 2)
-                        params["Pay"] = f"₱{round(hrs * HOURLY_RATE, 2)}"
-
-                # 4. SYNCED SUBMISSION LOGIC
-                # Send data to Google
-                res = requests.get(DEPLOYMENT_URL, params=params, timeout=15)
-                
-                # Send photo as JSON
-                payload = {"image": image_b64, "filename": photo_name}
-                requests.post(DEPLOYMENT_URL, json=payload, timeout=15)
-
-                if "SYNC_OK" in res.text:
-                    st.success(f"✅ Synced! {status} recorded for {name}.")
-                    st.balloons()
-                else:
-                    st.error(f"❌ Google rejected the log: {res.text}")
+                st.warning("⚠️ Logged, but please check the sheet.")
 
         except Exception as e:
-            st.error("⚠️ Connection Error. Refresh and try again.")
+            st.error("Connection Error. Please verify your Web App URL.")
 
 # --- 5. ADMIN PANEL ---
 if st.query_params.get("view") == "hmaxine" or (admin_mode and admin_pw == "Hmaxine"):
     st.divider()
     st.subheader("🛡️ Manager Dashboard")
     try:
+        # Re-fetch data for the dashboard
         df_admin = pd.read_csv(SHEET_CSV_URL)
+        # Clean the 'Pay' column so it can be summed
         df_admin['Pay_Num'] = df_admin['Pay'].replace(r'[₱,]', '', regex=True).astype(float).fillna(0)
-        st.metric(label="💰 Total Payroll", value=f"₱{round(df_admin['Pay_Num'].sum(), 2)}")
+        
+        st.metric(label="💰 Total Payroll Recorded", value=f"₱{round(df_admin['Pay_Num'].sum(), 2)}")
+        st.dataframe(df_admin[['Date', 'Employee', 'Clock In', 'Clock OUT', 'Hours', 'Pay']])
         st.link_button("📂 Open Drive Photos", f"https://drive.google.com/drive/folders/{DRIVE_FOLDER_ID}")
     except:
-        st.info("Awaiting records...")
-
+        st.info("Dashboard waiting for data...")
