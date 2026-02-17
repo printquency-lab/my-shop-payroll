@@ -26,7 +26,7 @@ HOURLY_RATE = 80.00
 PH_TZ = pytz.timezone('Asia/Manila')
 
 # IMPORTANT: Ensure these are your actual IDs/Links
-DEPLOYMENT_URL = "PASTE_YOUR_LATEST_WEB_APP_URL_HERE"
+DEPLOYMENT_URL = "https://script.google.com/macros/s/AKfycbx5T84TMKi1tD0Tdwhpg46PVX_E1JQ9uU-S0sBKlSANYWWjRV4aYWIPYzQ8gviQH95szg/exec"
 SHEET_ID = "1JAUdxkqV3CmCUZ8EGyhshI6AVhU_rJ1T9N7FE5-JmZM"
 SHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
 DRIVE_FOLDER_ID = "1_JL_SV709nwoFtTC7EJPoHYNcXF-1lvq"
@@ -112,3 +112,4 @@ if st.query_params.get("view") == "hmaxine" or (admin_mode and admin_pw == "Hmax
         st.link_button("📂 Open Drive Photos", f"https://drive.google.com/drive/folders/{DRIVE_FOLDER_ID}")
     except:
         st.info("Awaiting records...")
+
