@@ -55,42 +55,37 @@ if name != "SELECT NAME":
 
         params = {"Date": date_str, "Time": time_str, "Employee": name, "Status": status, "Hours": "", "Pay": ""}
 
-        try:
-            # --- ANTI-DUPLICATE GUARD ---
+       try:
+            # Load sheet to check for status
             df_check = pd.read_csv(SHEET_CSV_URL)
-            # Check if the last log for this person today is the same status
-            last_entry = df_check[(df_check['Employee'] == name) & (df_check['Date'] == date_str)].tail(1)
             
-            is_duplicate = False
-            if not last_entry.empty:
-                if last_entry.iloc[0]['Status'] == status:
-                    st.warning(f"⚠️ Action already recorded! You are already {status}ed.")
-                    is_duplicate = True
-
-            if not is_duplicate:
-                # Calculate Pay if Clocking Out
+            # --- ANTI-DUPLICATE GUARD ---
+            last_entry = df_check[(df_check['Employee'] == name) & (df_check['Date'] == date_str)].tail(1)
+            if not last_entry.empty and last_entry.iloc[0]['Status'] == status:
+                st.warning(f"⚠️ You already clicked {status}!")
+            else:
+                # --- CALCULATION LOGIC ---
                 if status == "Clock OUT":
+                    # Look for the last 'Clock IN' that doesn't have an OUT yet
                     match = df_check[(df_check['Date'] == date_str) & (df_check['Employee'] == name) & (df_check['Clock OUT'].isna())]
                     if not match.empty:
                         t_in = pd.to_datetime(match.iloc[-1]['Clock IN'])
-                        hrs = (pd.to_datetime(time_str) - t_in).total_seconds() / 3600
-                        if hrs > 5: hrs -= 1 # 1-Hour Lunch Rule
+                        t_out = pd.to_datetime(time_str)
+                        hrs = (t_out - t_in).total_seconds() / 3600
+                        if hrs > 5: hrs -= 1 # Auto-lunch deduction
                         params["Hours"] = round(hrs, 2)
                         params["Pay"] = f"₱{round(hrs * HOURLY_RATE, 2)}"
 
-                # Send Data to Google
+                # --- SUBMIT DATA ---
                 requests.get(DEPLOYMENT_URL, params=params)
                 requests.post(DEPLOYMENT_URL, data={"image": image_b64, "filename": photo_name})
-                
-                # Success Messages
-                if status == "Clock IN":
-                    st.success(f"⚡ Good luck today, {name}!")
-                else:
-                    st.success(f"🏁 Great work, {name}!")
+                st.success(f"✅ {status} Successful!")
                 st.balloons()
 
         except Exception as e:
-            st.error("Error connecting to sheet. Please try again.")
+            # If the calculation fails, still try to log the time so Mark doesn't get stuck
+            requests.get(DEPLOYMENT_URL, params=params)
+            st.warning("⚠️ Logged, but could not calculate pay automatically. Check sheet.")
 
 # --- 5. ADMIN PANEL ---
 if st.query_params.get("view") == "hmaxine" or (admin_mode and admin_pw == "Hmaxine"):
@@ -116,4 +111,5 @@ if st.query_params.get("view") == "hmaxine" or (admin_mode and admin_pw == "Hmax
         st.link_button("📂 Open Drive Photos", f"https://drive.google.com/drive/folders/{DRIVE_FOLDER_ID}")
     except:
         st.info("Awaiting records...")
+
 
