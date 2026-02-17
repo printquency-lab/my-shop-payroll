@@ -13,7 +13,7 @@ with col1:
     try:
         st.image("logo.png", width=80) 
     except:
-        st.error("Error: 'logo.png' not found.")
+        pass
 
 with col2:
     st.markdown("<h1 style='margin-top: -10px;'>Printquency Time Clock</h1>", unsafe_allow_html=True)
@@ -24,7 +24,7 @@ st.divider()
 HOURLY_RATE = 80.00
 PH_TZ = pytz.timezone('Asia/Manila')
 
-# Replace these with your actual IDs
+# IMPORTANT: Ensure your Web App URL is correct here
 DEPLOYMENT_URL = "https://script.google.com/macros/s/AKfycbx5T84TMKi1tD0Tdwhpg46PVX_E1JQ9uU-S0sBKlSANYWWjRV4aYWIPYzQ8gviQH95szg/exec"
 SHEET_ID = "1JAUdxkqV3CmCUZ8EGyhshI6AVhU_rJ1T9N7FE5-JmZM"
 SHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
@@ -56,14 +56,14 @@ if name != "SELECT NAME":
         params = {"Date": date_str, "Time": time_str, "Employee": name, "Status": status, "Hours": "", "Pay": ""}
 
         try:
-            # 1. Load data to check status
+            # 1. Load data to check status and calc pay
             df_check = pd.read_csv(SHEET_CSV_URL)
             
             # 2. Anti-Duplicate Check
             last_entry = df_check[(df_check['Employee'] == name) & (df_check['Date'] == date_str)].tail(1)
             is_duplicate = False
             if not last_entry.empty and last_entry.iloc[0]['Status'] == status:
-                st.warning(f"⚠️ Action already recorded! You are already {status}ed.")
+                st.warning(f"⚠️ You already clicked {status}!")
                 is_duplicate = True
 
             if not is_duplicate:
@@ -74,7 +74,7 @@ if name != "SELECT NAME":
                         t_in = pd.to_datetime(match.iloc[-1]['Clock IN'])
                         t_out = pd.to_datetime(time_str)
                         hrs = (t_out - t_in).total_seconds() / 3600
-                        if hrs > 5: hrs -= 1 # Auto-Lunch Deduction
+                        if hrs > 5: hrs -= 1 # Auto-Lunch deduction
                         params["Hours"] = round(hrs, 2)
                         params["Pay"] = f"₱{round(hrs * HOURLY_RATE, 2)}"
 
@@ -82,9 +82,9 @@ if name != "SELECT NAME":
                 requests.get(DEPLOYMENT_URL, params=params, timeout=15)
                 requests.post(DEPLOYMENT_URL, data={"image": image_b64, "filename": photo_name}, timeout=15)
                 
-                # 5. Success UI
+                # Success Feedback
                 if status == "Clock IN":
-                    st.success(f"⚡ Welcome, {name}!")
+                    st.success(f"⚡ Good luck today, {name}!")
                 else:
                     st.success(f"🏁 Great work, {name}!")
                 st.balloons()
@@ -100,9 +100,7 @@ if st.query_params.get("view") == "hmaxine" or (admin_mode and admin_pw == "Hmax
         df = pd.read_csv(SHEET_CSV_URL)
         df['Pay_Num'] = df['Pay'].replace(r'[₱,]', '', regex=True).astype(float).fillna(0)
         df['Date_Obj'] = pd.to_datetime(df['Date'])
-        
-        st.metric(label="💰 Grand Total Payroll", value=f"₱{round(df['Pay_Num'].sum(), 2)}")
-        
+        st.metric(label="💰 Total Payroll to Date", value=f"₱{round(df['Pay_Num'].sum(), 2)}")
         st.link_button("📂 Open Drive Photos", f"https://drive.google.com/drive/folders/{DRIVE_FOLDER_ID}")
     except:
         st.info("Awaiting records...")
